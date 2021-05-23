@@ -12,7 +12,7 @@ import os
 
 def update_guest_data(file_path:str,update_logs:bool=False,cnw_logs:bool=False):
     """
-    Collect Joe Rogan guest data and write to file with newest data from podcast using data sites and my CNW_Scraper tool's scrape_names function. Data is written out as klsjd;klfjfa
+    Collect Joe Rogan guest data and write to file with newest data from podcast using data sites and my CNW_Scraper tool's scrape_names function. Data is written out as a JSON and is ordered by guests that appeared from the latest episodes till the earliest.
 
     Data came from jrelibrary.com and DataWrapper. There is so much junk in here - unicode identifiers for non-ascii guest names, extra backslashes, inconsistent naming and multiple guest conventions used, missing names, hyperlinks sprinkled everywhere, extra quotes and other characters, junk html, ugh...
 
@@ -63,12 +63,12 @@ def update_guest_data(file_path:str,update_logs:bool=False,cnw_logs:bool=False):
 
     # Create basic guest data from jrelibrary.com/datawrapper.
     if update_logs: print("Setting up data objects ...")
-    guest_data = {}
+    guest_data = []
     fix_exceptions = ["Dr. Phil","Mr. T"] # Add more if needed.
     fix_removal = ["Dr. ","Mr. ","Mrs. ","Ms. ","Cmdr. "] # Ditto.
     fix = lambda x,r: x.replace(r, "") if x not in fix_exceptions else x
     for e in entries:
-        ep_num = int(re.match(r'\d+',e).group(0))
+        ep_num = re.match(r'\d+',e).group(0)
         date = re.search(r'"\w+\s\d+,\s\d+"$',e).group(0)[1:-1]
         name_data = re.search(r'(?<=\d,)"?"?\w.+(?=,")',e)
         if not name_data: continue
@@ -82,14 +82,17 @@ def update_guest_data(file_path:str,update_logs:bool=False,cnw_logs:bool=False):
         name_data.strip()
         # Split up multiple guests if any.
         names = list(map(lambda x: x.strip(),re.split(r',|&',name_data)))
+        ap = {"Episode": ep_num,"Date": date}
         for n in names:
             for f in fix_removal:
                 n = fix(n,f).strip()
-            if n in guest_data.keys():
-                # This person already exists - add appearance.
-                guest_data[n]["Appearances"].append((ep_num,date))
-                continue
-            guest_data.update({n:{"Name":n,"Appearances":[(ep_num,date)]}})
+            for i,d in enumerate(guest_data):
+                if n == d["Name"]:
+                    # This person already exists - add appearance.
+                    guest_data[i]["Appearances"].append(ap)
+                    break
+            else:
+                guest_data.append({"Name":n,"Appearances":[ap]})
 
     # Get remaining data from celebritynetworth.com using my handy scraper.
     if update_logs: print("Collecting extra data from CNW (this may take a bit) ...")
@@ -98,24 +101,24 @@ def update_guest_data(file_path:str,update_logs:bool=False,cnw_logs:bool=False):
         cnw.Logs.print_to_console = True
         cnw.Logs.verbose = True
         cnw.Logs.write_to_file(os.path.split(file_path)[0]+"/cnw")
-    profiles = cnw.scrape_names([n for n in guest_data.keys()])
+    profiles = cnw.scrape_names([d["Name"] for d in guest_data])
 
     # Add extra data to the guests.
     if update_logs: print("Parsing and adding extra data ...")
     valid_chars = lambda c: c.isalnum() or any([x in c for x in [" ","-","'"]])
     parse_name = lambda n: "".join(filter(valid_chars, n)).strip()
-    for g in guest_data.keys():
+    for i in range(len(guest_data)):
         for field in cnw.Profile.fields:
             if field == "Name": continue
-            guest_data[g][field] = "N/A"
-        guest_name = parse_name(guest_data[g]["Name"])
+            guest_data[i][field] = "N/A"
+        guest_name = parse_name(guest_data[i]["Name"])
         for p in profiles:
             t = p.description.lower()[:400]
             if all([x in t for x in guest_name.lower().split()]):
-                for k in guest_data[g].keys():
+                for k in guest_data[i].keys():
                     if k not in p.stats:continue
                     if k == "Name": continue
-                    guest_data[g][k] = p.stats[k]
+                    guest_data[i][k] = p.stats[k]
                 break
 
     # Write data and done.
@@ -124,26 +127,9 @@ def update_guest_data(file_path:str,update_logs:bool=False,cnw_logs:bool=False):
         json.dump(guest_data,f,indent=4)
     if update_logs: print("\nGuest updates done.\n")
 
-# df = pandas.read_json(".data/test/guest_data.json")
+# update_guest_data(".data/test/guest_data.json",True)
 
-obj = """{
-        "Name": "Reggie Watts",
-        "Appearances": [
-            {"Episode": 1648,"Date": "May 8, 2021"},
-            {"Episode": 1484,"Date": "Jun 2, 2020"},
-            {"Episode": 1322,"Date": "Jul 10, 2019"},
-            {"Episode": 1015,"Date": "Sep 26, 2017"}
-        ],
-        "Net Worth": "2000000",
-        "Salary": "$666 per episode",
-        "Date of Birth": "Mar 23, 1972 (49 years old)",
-        "Gender": "Male",
-        "Height": "6 ft (1.83 m)",
-        "Profession": "Comedian, Singer, Musician, Actor, Screenwriter, Film Score Composer",
-        "Nationality": "United States of America",
-        "Last Updated": "2020"
-    }"""
 
-# with open("test.json","w") as f:
-df = pandas.json_normalize(json.loads(obj))
-# print(df.dtypes)
+df = pandas.read_json(".data/test/guest_data.json")
+
+print(df)
