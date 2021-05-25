@@ -1,5 +1,6 @@
 """
 Modify as you see fit.
+DELETE LATER
 """
 
 import cnw_scraper as cnw
@@ -10,15 +11,15 @@ import json
 import re
 import os
 
-def update_guest_data(file_path:str,update_logs:bool=False,cnw_logs:bool=False):
+def collect_guest_data(file_path:str,update_logs:bool=False,cnw_logs:bool=False):
     """
     Collect Joe Rogan guest data and write to file with newest data from podcast using data sites and my CNW_Scraper tool's scrape_names function. Data is written out as a JSON and is ordered by guests that appeared from the latest episodes till the earliest.
 
     Data came from jrelibrary.com and DataWrapper. There is so much junk in here - unicode identifiers for non-ascii guest names, extra backslashes, inconsistent naming and multiple guest conventions used, missing names, hyperlinks sprinkled everywhere, extra quotes and other characters, junk html, ugh...
 
-    The data is from the general podcasts ONLY - no MMA, fight companion, specials. Name and which episodes a guest appeared on are collected from jrelibrary, and the extra stuff (if avaliable) is from celebritynetworth. It's not perfect, but neither is the data that gets collected. So...Enjoy.
+    The data is from the general podcasts ONLY - no MMA, fight companion, specials. Name and which episodes a guest appeared on are collected from jrelibrary, and the extra stuff (if avaliable) is from celebritynetworth. It's not perfect, but the data that gets collected is even less perfect. So...Enjoy.
 
-    :file_path: String to where you want to save the guest data (should be saved as JSON, but whatever floats yer boat.) Will be overwritten if file already exists.
+    :file_path: String to where you want to save the guest data (file type should be saved as JSON, but whatever floats yer boat.) Will be overwritten if file already exists.
 
     :update_logs: Print to terminal what this function is doing? False by default.
 
@@ -110,7 +111,7 @@ def update_guest_data(file_path:str,update_logs:bool=False,cnw_logs:bool=False):
     for i in range(len(guest_data)):
         for field in cnw.Profile.fields:
             if field == "Name": continue
-            guest_data[i][field] = "N/A"
+            guest_data[i][field] = None
         guest_name = parse_name(guest_data[i]["Name"])
         for p in profiles:
             t = p.description.lower()[:400]
@@ -127,9 +128,3 @@ def update_guest_data(file_path:str,update_logs:bool=False,cnw_logs:bool=False):
         json.dump(guest_data,f,indent=4)
     if update_logs: print("\nGuest updates done.\n")
 
-# update_guest_data(".data/test/guest_data.json",True)
-
-
-df = pandas.read_json(".data/test/guest_data.json")
-
-print(df)
